@@ -200,7 +200,8 @@ module FastlaneCore
     end
 
     def build_upload_command(username, password, source = "/tmp")
-      [
+      short_team_id = (ENV['FASTLANE_SHORT_TEAM_ID'] || '').strip
+      command = [
         '"' + Helper.transporter_path + '"',
         "-m upload",
         "-u \"#{username}\"",
@@ -209,7 +210,9 @@ module FastlaneCore
         ENV["DELIVER_ITMSTRANSPORTER_ADDITIONAL_UPLOAD_PARAMETERS"], # that's here, because the user might overwrite the -t option
         "-t 'Signiant'",
         "-k 100000"
-      ].join(' ')
+      ]
+      command << "-itc_provider #{short_team_id}" if short_team_id.length > 0
+      command.join(' ')
     end
 
     def shell_escaped_password(password)
