@@ -31,10 +31,13 @@ module FastlaneCore
     # Returns a new instance of the iTunesTransporter.
     # If no username or password given, it will be taken from
     # the #{CredentialsManager::AccountManager}
-    def initialize(user = nil, password = nil)
+    # Optionally takes a team_id paramter to handle multiple ITC accounts.
+    # If no parameter is set, it reads it from the environment
+    def initialize(user = nil, password = nil, team_id = nil)
       data = CredentialsManager::AccountManager.new(user: user, password: password)
       @user = data.user
       @password = data.password
+      @team_id = team_id || (ENV['FASTLANE_SHORT_TEAM_ID'] || '').strip
     end
 
     # Downloads the latest version of the app metadata package from iTC.
@@ -47,8 +50,8 @@ module FastlaneCore
       dir ||= "/tmp"
 
       Helper.log.info "Going to download app metadata from iTunes Connect"
-      command = build_download_command(@user, @password, app_id, dir)
-      Helper.log.debug build_download_command(@user, 'YourPassword', app_id, dir) if $verbose
+      command = build_download_command(@user, @password, app_id, dir, @team_id)
+      Helper.log.debug build_download_command(@user, 'YourPassword', app_id, dir, @team_id) if $verbose
 
       result = execute_transporter(command)
 
@@ -74,8 +77,8 @@ module FastlaneCore
       Helper.log.info "Going to upload updated app to iTunes Connect"
       Helper.log.info "This might take a few minutes, please don't interrupt the script".green
 
-      command = build_upload_command(@user, @password, dir)
-      Helper.log.debug build_upload_command(@user, 'YourPassword', dir) if $verbose
+      command = build_upload_command(@user, @password, dir, @team_id)
+      Helper.log.debug build_upload_command(@user, 'YourPassword', dir, @team_id) if $verbose
 
       result = execute_transporter(command)
 
@@ -188,19 +191,20 @@ module FastlaneCore
       end
     end
 
-    def build_download_command(username, password, apple_id, destination = "/tmp")
-      [
+    def build_download_command(username, password, apple_id, destination = "/tmp", team_id)
+      command = [
         '"' + Helper.transporter_path + '"',
         "-m lookupMetadata",
         "-u \"#{username}\"",
         "-p #{shell_escaped_password(password)}",
         "-apple_id #{apple_id}",
         "-destination '#{destination}'"
-      ].join(' ')
+      ]
+      command << "-itc_provider #{team_id}" if team_id.length > 0
+      command.join(' ')
     end
 
-    def build_upload_command(username, password, source = "/tmp")
-      short_team_id = (ENV['FASTLANE_SHORT_TEAM_ID'] || '').strip
+    def build_upload_command(username, password, source = "/tmp", team_id)
       command = [
         '"' + Helper.transporter_path + '"',
         "-m upload",
@@ -211,7 +215,7 @@ module FastlaneCore
         "-t 'Signiant'",
         "-k 100000"
       ]
-      command << "-itc_provider #{short_team_id}" if short_team_id.length > 0
+      command << "-itc_provider #{team_id}" if team_id.length > 0
       command.join(' ')
     end
 
